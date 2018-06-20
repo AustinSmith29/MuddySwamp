@@ -48,8 +48,8 @@ class ServerComand:
         self.params = params
 
 class MudServerWorker(threading.Thread):
-    def __init__(self, q, *args, **kwargs):
-        self.q = q
+    def __init__(self, cmd_queue, *args, **kwargs):
+        self.cmd_queue = cmd_queue
         # TODO: replace this with the player class
         # stores the players in the game
         self.players = {}
@@ -79,7 +79,7 @@ class MudServerWorker(threading.Thread):
             time.sleep(0.2)
 
             try:
-                server_command = self.q.get(block=False)
+                server_command = self.cmd_queue.get(block=False)
                 if server_command is not None:
                     if server_command.command_type == ServerCommandEnum.BROADCAST_MESSAGE:
                         self.mud.send_message_to_all(server_command.params)
@@ -233,9 +233,9 @@ class MudServerWorker(threading.Thread):
         self.mud.shutdown()
 
 # Create a threadsafe queue for commands entered on the server side
-q = queue.Queue()
+cmd_queue = queue.Queue()
 # Create an instance of the thread and start it
-thread = MudServerWorker(q)
+thread = MudServerWorker(cmd_queue)
 thread.setName("MudServerThread")
 thread.start()
 
@@ -244,11 +244,11 @@ while True:
     try:
         command, params = (input("").split(" ", 1) + ["", ""])[:2]
         if command == "broadcast":
-            q.put(ServerComand(ServerCommandEnum.BROADCAST_MESSAGE, u"\u001b[32m" + "[Server] " + params + u"\u001b[0m"))
+            cmd_queue.put(ServerComand(ServerCommandEnum.BROADCAST_MESSAGE, u"\u001b[32m" + "[Server] " + params + u"\u001b[0m"))
         elif command == "players":
-            q.put(ServerComand(ServerCommandEnum.GET_PLAYERS, ""))
+            cmd_queue.put(ServerComand(ServerCommandEnum.GET_PLAYERS, ""))
         elif command == "stop":
-            q.put(ServerComand(ServerCommandEnum.BROADCAST_MESSAGE, u"\u001b[32m" + "[Server] " + "Server shutting down..." + u"\u001b[0m"))
+            cmd_queue.put(ServerComand(ServerCommandEnum.BROADCAST_MESSAGE, u"\u001b[32m" + "[Server] " + "Server shutting down..." + u"\u001b[0m"))
             break
         elif command == "help":
             logging.info("Server commands are: \n" \
@@ -259,7 +259,7 @@ while True:
             logging.info("Command not recognized. Type help for a list of commands.")
     except KeyboardInterrupt:
         logging.info("Keyboard interrupt detected. Shutting down.")
-        q.put(ServerComand(ServerCommandEnum.BROADCAST_MESSAGE, u"\u001b[32m" + "[Server] " + "Server shutting down..." + u"\u001b[0m"))
+        cmd_queue.put(ServerComand(ServerCommandEnum.BROADCAST_MESSAGE, u"\u001b[32m" + "[Server] " + "Server shutting down..." + u"\u001b[0m"))
         break
 
 
